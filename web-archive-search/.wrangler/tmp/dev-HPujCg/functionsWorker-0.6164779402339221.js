@@ -110,20 +110,19 @@ async function fetchWayback(url) {
   const firstRow = firstRes.status === "fulfilled" ? firstRes.value : null;
   const lastRow = lastRes.status === "fulfilled" ? lastRes.value : null;
   const fullRows = fullRes.status === "fulfilled" ? fullRes.value : null;
-  let firstTs, lastTs;
-  if (firstRow && firstRow.length >= 2) {
-    firstTs = firstRow[1]?.[0];
-    lastTs = lastRow?.[1]?.[0] ?? firstTs;
-  } else {
+  let snapshots;
+  if (fullRows && fullRows.length > 1) {
+    snapshots = fullRows.slice(1).map(([ts]) => makeSnap(ts, url));
+  }
+  let firstTs = firstRow?.[1]?.[0] ?? fullRows?.[1]?.[0] ?? null;
+  let lastTs = lastRow?.[1]?.[0] ?? fullRows?.[fullRows?.length - 1]?.[0] ?? firstTs;
+  if (!firstTs) {
     const avail = await fetchAvailability(url);
     if (!avail) return { snapshots: [], total: 0 };
     firstTs = avail;
     lastTs = avail;
   }
-  let snapshots;
-  if (fullRows && fullRows.length > 1) {
-    snapshots = fullRows.slice(1).map(([ts]) => makeSnap(ts, url));
-  } else {
+  if (!snapshots) {
     snapshots = [firstTs, lastTs].filter(Boolean).map((ts) => makeSnap(ts, url));
   }
   return {
@@ -132,7 +131,6 @@ async function fetchWayback(url) {
     lastSeen: formatTimestamp(lastTs),
     snapshots,
     partial: !fullRows
-    // timeline may be incomplete
   };
 }
 __name(fetchWayback, "fetchWayback");

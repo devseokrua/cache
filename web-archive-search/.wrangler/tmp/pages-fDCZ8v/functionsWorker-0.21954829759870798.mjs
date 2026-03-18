@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-IoCtqS/checked-fetch.js
+// ../.wrangler/tmp/bundle-s0oglU/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -82,20 +82,19 @@ async function fetchWayback(url) {
   const firstRow = firstRes.status === "fulfilled" ? firstRes.value : null;
   const lastRow = lastRes.status === "fulfilled" ? lastRes.value : null;
   const fullRows = fullRes.status === "fulfilled" ? fullRes.value : null;
-  let firstTs, lastTs;
-  if (firstRow && firstRow.length >= 2) {
-    firstTs = firstRow[1]?.[0];
-    lastTs = lastRow?.[1]?.[0] ?? firstTs;
-  } else {
+  let snapshots;
+  if (fullRows && fullRows.length > 1) {
+    snapshots = fullRows.slice(1).map(([ts]) => makeSnap(ts, url));
+  }
+  let firstTs = firstRow?.[1]?.[0] ?? fullRows?.[1]?.[0] ?? null;
+  let lastTs = lastRow?.[1]?.[0] ?? fullRows?.[fullRows?.length - 1]?.[0] ?? firstTs;
+  if (!firstTs) {
     const avail = await fetchAvailability(url);
     if (!avail) return { snapshots: [], total: 0 };
     firstTs = avail;
     lastTs = avail;
   }
-  let snapshots;
-  if (fullRows && fullRows.length > 1) {
-    snapshots = fullRows.slice(1).map(([ts]) => makeSnap(ts, url));
-  } else {
+  if (!snapshots) {
     snapshots = [firstTs, lastTs].filter(Boolean).map((ts) => makeSnap(ts, url));
   }
   return {
@@ -104,7 +103,6 @@ async function fetchWayback(url) {
     lastSeen: formatTimestamp(lastTs),
     snapshots,
     partial: !fullRows
-    // timeline may be incomplete
   };
 }
 __name(fetchWayback, "fetchWayback");
@@ -771,7 +769,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-IoCtqS/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-s0oglU/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -803,7 +801,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-IoCtqS/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-s0oglU/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
