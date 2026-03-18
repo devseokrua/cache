@@ -240,6 +240,26 @@ body {
 .search-btn:active { transform: scale(.97); }
 .search-btn:disabled { opacity: .5; cursor: not-allowed; }
 
+.btn-spin {
+  display: none;
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .65s linear infinite;
+  flex-shrink: 0;
+}
+.search-btn.is-loading .btn-text { display: none; }
+.search-btn.is-loading .btn-spin { display: block; }
+
+.turnstile-wrap {
+  margin-top: 12px;
+  min-height: 65px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .hero-examples {
   margin-top: 16px;
   display: flex;

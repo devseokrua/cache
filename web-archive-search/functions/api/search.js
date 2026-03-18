@@ -19,6 +19,13 @@ export async function onRequestGet(context) {
   const cleanUrl = normalizeUrl(rawUrl);
   if (!cleanUrl) return jsonResponse({ error: 'Invalid URL' }, 400);
 
+  // Turnstile verification
+  const turnstileToken = url.searchParams.get('turnstile');
+  if (!turnstileToken) return jsonResponse({ error: 'Security verification required' }, 400);
+  const secret = context.env?.TURNSTILE_SECRET ?? '0x4AAAAAACFyt2ZktPhBpEeVuxOzU1q5yU8';
+  const verified = await verifyTurnstile(turnstileToken, request.headers.get('CF-Connecting-IP') || '', secret);
+  if (!verified) return jsonResponse({ error: 'Security verification failed. Please reload and try again.' }, 403);
+
   // Cloudflare cache
   const cacheKey = new Request(`https://cache.internal/archive/v3/${encodeURIComponent(cleanUrl)}`);
   const cache = caches.default;
@@ -210,6 +217,25 @@ function buildServices(url, { wayback, loc, uk, pt }) {
       snapshots: [],
     },
   ];
+}
+
+// ─── Turnstile verification ───────────────────────────────────────────────────
+
+async function verifyTurnstile(token, ip, secret) {
+  try {
+    const form = new FormData();
+    form.append('secret', secret);
+    form.append('response', token);
+    if (ip) form.append('remoteip', ip);
+    const res = await withTimeout(
+      fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', { method: 'POST', body: form }),
+      5000,
+    );
+    const data = await res.json();
+    return data.success === true;
+  } catch {
+    return false;
+  }
 }
 
 // ─── Timeout helper ───────────────────────────────────────────────────────────

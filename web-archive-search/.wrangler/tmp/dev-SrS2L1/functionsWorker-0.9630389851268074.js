@@ -66,6 +66,11 @@ async function onRequestGet(context) {
   if (!rawUrl) return jsonResponse({ error: "Missing url parameter" }, 400);
   const cleanUrl = normalizeUrl(rawUrl);
   if (!cleanUrl) return jsonResponse({ error: "Invalid URL" }, 400);
+  const turnstileToken = url.searchParams.get("turnstile");
+  if (!turnstileToken) return jsonResponse({ error: "Security verification required" }, 400);
+  const secret = context.env?.TURNSTILE_SECRET ?? "0x4AAAAAACFyt2ZktPhBpEeVuxOzU1q5yU8";
+  const verified = await verifyTurnstile(turnstileToken, request.headers.get("CF-Connecting-IP") || "", secret);
+  if (!verified) return jsonResponse({ error: "Security verification failed. Please reload and try again." }, 403);
   const cacheKey = new Request(`https://cache.internal/archive/v3/${encodeURIComponent(cleanUrl)}`);
   const cache = caches.default;
   const cached = await cache.match(cacheKey);
@@ -247,6 +252,24 @@ function buildServices(url, { wayback, loc, uk, pt }) {
 }
 __name(buildServices, "buildServices");
 __name2(buildServices, "buildServices");
+async function verifyTurnstile(token, ip, secret) {
+  try {
+    const form = new FormData();
+    form.append("secret", secret);
+    form.append("response", token);
+    if (ip) form.append("remoteip", ip);
+    const res = await withTimeout(
+      fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form }),
+      5e3
+    );
+    const data = await res.json();
+    return data.success === true;
+  } catch {
+    return false;
+  }
+}
+__name(verifyTurnstile, "verifyTurnstile");
+__name2(verifyTurnstile, "verifyTurnstile");
 function withTimeout(promise, ms) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms);

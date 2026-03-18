@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-PRtXYo/checked-fetch.js
+// ../.wrangler/tmp/bundle-EHTeb7/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -39,6 +39,11 @@ async function onRequestGet(context) {
   if (!rawUrl) return jsonResponse({ error: "Missing url parameter" }, 400);
   const cleanUrl = normalizeUrl(rawUrl);
   if (!cleanUrl) return jsonResponse({ error: "Invalid URL" }, 400);
+  const turnstileToken = url.searchParams.get("turnstile");
+  if (!turnstileToken) return jsonResponse({ error: "Security verification required" }, 400);
+  const secret = context.env?.TURNSTILE_SECRET ?? "0x4AAAAAACFyt2ZktPhBpEeVuxOzU1q5yU8";
+  const verified = await verifyTurnstile(turnstileToken, request.headers.get("CF-Connecting-IP") || "", secret);
+  if (!verified) return jsonResponse({ error: "Security verification failed. Please reload and try again." }, 403);
   const cacheKey = new Request(`https://cache.internal/archive/v3/${encodeURIComponent(cleanUrl)}`);
   const cache = caches.default;
   const cached = await cache.match(cacheKey);
@@ -213,6 +218,23 @@ function buildServices(url, { wayback, loc, uk, pt }) {
   ];
 }
 __name(buildServices, "buildServices");
+async function verifyTurnstile(token, ip, secret) {
+  try {
+    const form = new FormData();
+    form.append("secret", secret);
+    form.append("response", token);
+    if (ip) form.append("remoteip", ip);
+    const res = await withTimeout(
+      fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form }),
+      5e3
+    );
+    const data = await res.json();
+    return data.success === true;
+  } catch {
+    return false;
+  }
+}
+__name(verifyTurnstile, "verifyTurnstile");
 function withTimeout(promise, ms) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms);
@@ -749,7 +771,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-PRtXYo/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-EHTeb7/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -781,7 +803,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-PRtXYo/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-EHTeb7/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;

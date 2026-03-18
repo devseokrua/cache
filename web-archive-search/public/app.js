@@ -45,6 +45,7 @@ const LANGS = {
     ctaText: 'We build high-performance web products and SEO solutions. Ivatech agency is available for new projects on Upwork.',
     ctaBtn: 'Work with Ivatech on Upwork',
     footerText: 'Aggregates data from open archives:',
+    turnstileError: 'Complete the security check below',
   },
   uk: {
     badge: 'Пошук в веб-архівах',
@@ -90,6 +91,7 @@ const LANGS = {
     ctaText: 'Ми створюємо високопродуктивні веб-продукти та SEO-рішення. Агентство Ivatech відкрите до нових проєктів на Upwork.',
     ctaBtn: 'Співпрацювати з Ivatech на Upwork',
     footerText: 'Агрегує дані з відкритих архівів:',
+    turnstileError: 'Пройдіть перевірку безпеки нижче',
   },
   ru: {
     badge: 'Поиск по веб-архивам',
@@ -135,14 +137,16 @@ const LANGS = {
     ctaText: 'Мы создаём высокопроизводительные веб-продукты и SEO-решения. Агентство Ivatech открыто для новых проектов на Upwork.',
     ctaBtn: 'Сотрудничать с Ivatech на Upwork',
     footerText: 'Агрегирует данные из открытых архивов:',
+    turnstileError: 'Пройдите проверку безопасности ниже',
   },
 };
 
 /* ─── State ──────────────────────────────────────────────────────────────── */
 
-let currentData = null;
-let activeYear  = null;
-let lang        = localStorage.getItem('lang') || 'en';
+let currentData  = null;
+let activeYear   = null;
+let lang         = localStorage.getItem('lang') || 'en';
+let turnstileId  = null;
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 
@@ -225,6 +229,16 @@ langSwitcher.querySelectorAll('.lang-btn').forEach(btn => {
   });
 });
 
+/* ─── Turnstile ──────────────────────────────────────────────────────────── */
+
+window.onTurnstileLoad = function () {
+  turnstileId = turnstile.render('#cfTurnstile', {
+    sitekey: '0x4AAAAAACFyt9G84DsGoeqJ',
+    theme: 'auto',
+    size: 'compact',
+  });
+};
+
 /* ─── Init ───────────────────────────────────────────────────────────────── */
 
 initTheme();
@@ -243,7 +257,7 @@ document.querySelectorAll('.example-btn').forEach(btn => {
 const initUrl = new URLSearchParams(location.search).get('q');
 if (initUrl) {
   searchInput.value = initUrl;
-  doSearch(initUrl);
+  // Don't auto-search: Turnstile token is required
 }
 
 /* ─── Search ─────────────────────────────────────────────────────────────── */
@@ -256,12 +270,21 @@ async function onSearch() {
 }
 
 async function doSearch(url) {
+  const token = (turnstileId != null && typeof turnstile !== 'undefined')
+    ? turnstile.getResponse(turnstileId)
+    : null;
+
+  if (!token) {
+    setError(t('turnstileError'));
+    return;
+  }
+
   setLoading(true);
   setError(null);
   hideResults();
 
   try {
-    const res = await fetch(`/api/search?url=${encodeURIComponent(url)}`);
+    const res = await fetch(`/api/search?url=${encodeURIComponent(url)}&turnstile=${encodeURIComponent(token)}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Request error');
     currentData = data;
@@ -270,6 +293,9 @@ async function doSearch(url) {
     setError(err.message || 'Failed to fetch data. Please try again.');
   } finally {
     setLoading(false);
+    if (turnstileId != null && typeof turnstile !== 'undefined') {
+      turnstile.reset(turnstileId);
+    }
   }
 }
 
@@ -397,7 +423,7 @@ function renderSnapshotList(snapshots, year) {
 function setLoading(on) {
   loading.classList.toggle('active', on);
   searchBtn.disabled = on;
-  searchBtn.textContent = on ? '…' : t('searchBtn');
+  searchBtn.classList.toggle('is-loading', on);
 }
 
 function setError(msg) {

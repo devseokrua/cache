@@ -5,8 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Chronica — Web Archive Search</title>
   <meta name="description" content="Search any website's history across Wayback Machine, Archive.today, Library of Congress and other archives — all in one place.">
+
+  <!-- Favicons -->
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="shortcut icon" href="/favicon.svg">
+
+  <!-- Open Graph / Twitter -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://webcache.ivatech.dev/">
   <meta property="og:title" content="Chronica — Web Archive Search">
   <meta property="og:description" content="Find how any website looked in the past. Wayback Machine, Archive.today and more — all in one search.">
+  <meta property="og:image" content="https://webcache.ivatech.dev/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name" content="Chronica">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Chronica — Web Archive Search">
+  <meta name="twitter:description" content="Find how any website looked in the past. Wayback Machine, Archive.today and more — all in one search.">
+  <meta name="twitter:image" content="https://webcache.ivatech.dev/og.png">
+
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -46,7 +63,14 @@
     <div class="search-wrap">
       <input type="text" id="searchInput" class="search-input"
         autocomplete="off" autocapitalize="none" spellcheck="false">
-      <button class="search-btn" id="searchBtn" data-i18n="searchBtn"></button>
+      <button class="search-btn" id="searchBtn">
+        <span class="btn-text" data-i18n="searchBtn"></span>
+        <span class="btn-spin"></span>
+      </button>
+    </div>
+
+    <div class="turnstile-wrap">
+      <div id="cfTurnstile"></div>
     </div>
 
     <div class="error-msg" id="errorMsg"></div>
@@ -213,5 +237,6 @@
 </footer>
 
 <script src="app.js"></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onTurnstileLoad&render=explicit" async defer></script>
 </body>
 </html>
