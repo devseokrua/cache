@@ -19,12 +19,14 @@ export async function onRequestGet(context) {
   const cleanUrl = normalizeUrl(rawUrl);
   if (!cleanUrl) return jsonResponse({ error: 'Invalid URL' }, 400);
 
-  // Turnstile verification
-  const turnstileToken = url.searchParams.get('turnstile');
-  if (!turnstileToken) return jsonResponse({ error: 'Security verification required' }, 400);
-  const secret = context.env?.TURNSTILE_SECRET ?? '0x4AAAAAACFyt2ZktPhBpEeVuxOzU1q5yU8';
-  const verified = await verifyTurnstile(turnstileToken, request.headers.get('CF-Connecting-IP') || '', secret);
-  if (!verified) return jsonResponse({ error: 'Security verification failed. Please reload and try again.' }, 403);
+  // Turnstile verification (skipped in local dev when TURNSTILE_SECRET is not set)
+  const secret = context.env?.TURNSTILE_SECRET ?? null;
+  if (secret) {
+    const turnstileToken = url.searchParams.get('turnstile');
+    if (!turnstileToken) return jsonResponse({ error: 'Security verification required' }, 400);
+    const verified = await verifyTurnstile(turnstileToken, request.headers.get('CF-Connecting-IP') || '', secret);
+    if (!verified) return jsonResponse({ error: 'Security verification failed. Please reload and try again.' }, 403);
+  }
 
   // Cloudflare cache
   const cacheKey = new Request(`https://cache.internal/archive/v3/${encodeURIComponent(cleanUrl)}`);
@@ -32,20 +34,17 @@ export async function onRequestGet(context) {
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
 
-  // Fetch all archives in parallel with per-source timeouts
-  const [waybackRes, locRes, ukRes, ptRes] = await Promise.allSettled([
+  // Fetch archives in parallel — LoC and UK Web Archive CDX APIs are defunct,
+  // so only Wayback Machine and Arquivo.pt are queried
+  const [waybackRes, ptRes] = await Promise.allSettled([
     withTimeout(fetchWayback(cleanUrl), 20000),
-    withTimeout(fetchCdx(`https://webarchive.loc.gov/cdx/search/cdx?url=${encodeURIComponent(cleanUrl)}&output=json&fl=timestamp&collapse=timestamp:6&limit=200&filter=statuscode:200`), 8000),
-    withTimeout(fetchCdx(`https://www.webarchive.org.uk/wayback/archive/cdx?url=${encodeURIComponent(cleanUrl)}&output=json&fl=timestamp&collapse=timestamp:6&limit=200&filter=statuscode:200`), 8000),
-    withTimeout(fetchCdx(`https://arquivo.pt/cdx?url=${encodeURIComponent(cleanUrl)}&output=json&fl=timestamp&collapse=timestamp:6&limit=200&statuscode=200`), 8000),
+    withTimeout(fetchArquivoPt(cleanUrl), 8000),
   ]);
 
   const wayback = waybackRes.status === 'fulfilled' ? waybackRes.value : null;
-  const loc     = locRes.status === 'fulfilled' ? locRes.value : null;
-  const uk      = ukRes.status === 'fulfilled' ? ukRes.value : null;
   const pt      = ptRes.status === 'fulfilled' ? ptRes.value : null;
 
-  const services = buildServices(cleanUrl, { wayback, loc, uk, pt });
+  const services = buildServices(cleanUrl, { wayback, pt });
   const result = { url: cleanUrl, services };
 
   const response = jsonResponse(result, 200);
@@ -86,11 +85,16 @@ async function fetchWayback(url) {
   }
 
   // Take true min/max across all sources — fullRows may be truncated so
-  // limit=1 queries are more authoritative when they succeed
-  const firstCandidates = [firstRow?.[1]?.[0], fullRows?.[1]?.[0], avail].filter(Boolean);
-  const lastCandidates  = [lastRow?.[1]?.[0], fullRows?.[fullRows?.length - 1]?.[0]].filter(Boolean);
-  const firstTs = firstCandidates.length ? firstCandidates.sort()[0]     : null;
-  const lastTs  = lastCandidates.length  ? lastCandidates.sort().at(-1)  : firstTs;
+  // Availability API returns closest-to-now snapshot → good lastTs candidate.
+  // Discard lastRow if CDX reverse query is broken (returns same/older ts than first).
+  const firstTs_fast = firstRow?.[1]?.[0] ?? null;
+  const lastTs_fast  = lastRow?.[1]?.[0]  ?? null;
+  const validLastRow = lastTs_fast && firstTs_fast && lastTs_fast > firstTs_fast ? lastTs_fast : null;
+
+  const firstCandidates = [firstTs_fast, fullRows?.[1]?.[0]].filter(Boolean);
+  const lastCandidates  = [validLastRow, fullRows?.[fullRows?.length - 1]?.[0], avail].filter(Boolean);
+  const firstTs = firstCandidates.length ? firstCandidates.sort()[0]    : avail ?? null;
+  const lastTs  = lastCandidates.length  ? lastCandidates.sort().at(-1) : firstTs;
 
   if (!firstTs) return { snapshots: [], total: 0 };
 
@@ -122,19 +126,28 @@ async function fetchCdxRaw(cdxUrl) {
   return res.json();
 }
 
-// Wayback Availability API — fast single-snapshot check, returns timestamp or null
+// Wayback Availability API — fast single-snapshot check, returns timestamp or null.
+// Tries bare URL and www. prefix in parallel (CDX normalises www but Availability doesn't).
 async function fetchAvailability(url) {
-  try {
-    const res = await withTimeout(
-      fetch(`https://archive.org/wayback/available?url=${encodeURIComponent(url)}`, { headers: HEADERS }),
-      8000,
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data?.archived_snapshots?.closest?.timestamp ?? null;
-  } catch {
-    return null;
+  async function tryOne(candidate) {
+    try {
+      const res = await withTimeout(
+        fetch(`https://archive.org/wayback/available?url=${encodeURIComponent(candidate)}`, { headers: HEADERS }),
+        8000,
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data?.archived_snapshots?.closest?.timestamp ?? null;
+    } catch {
+      return null;
+    }
   }
+  const [a, b] = await Promise.all([tryOne(url), tryOne(`www.${url}`)]);
+  // Return whichever is more recent (both null → null)
+  if (!a && !b) return null;
+  if (!a) return b;
+  if (!b) return a;
+  return a > b ? a : b;
 }
 
 // ─── Generic CDX query (for LoC, UK, Arquivo.pt) ─────────────────────────────
@@ -151,9 +164,33 @@ async function fetchCdx(cdxUrl) {
   };
 }
 
+// ─── Arquivo.pt — returns NDJSON (one JSON object per line) ──────────────────
+
+async function fetchArquivoPt(url) {
+  try {
+    const res = await fetch(
+      `https://arquivo.pt/wayback/cdx?url=${encodeURIComponent(url)}&output=json&fl=timestamp&collapse=timestamp:6&limit=200`,
+      { headers: HEADERS },
+    );
+    if (!res.ok) return null;
+    const text = await res.text();
+    const timestamps = text.trim().split('\n')
+      .map(line => { try { return JSON.parse(line).timestamp; } catch { return null; } })
+      .filter(Boolean);
+    if (!timestamps.length) return null;
+    return {
+      total: timestamps.length,
+      firstSeen: formatTimestamp(timestamps.at(0)),
+      lastSeen: formatTimestamp(timestamps.at(-1)),
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ─── Build unified service list ───────────────────────────────────────────────
 
-function buildServices(url, { wayback, loc, uk, pt }) {
+function buildServices(url, { wayback, pt }) {
   return [
     {
       id: 'wayback',
@@ -184,10 +221,10 @@ function buildServices(url, { wayback, loc, uk, pt }) {
       name: 'Library of Congress',
       description: 'Веб-архив Библиотеки Конгресса США',
       color: '#8e44ad',
-      hasData: !!loc,
-      totalSnapshots: loc?.total ?? null,
-      firstSeen: loc?.firstSeen ?? null,
-      lastSeen: loc?.lastSeen ?? null,
+      hasData: true, // link only — CDX API discontinued
+      totalSnapshots: null,
+      firstSeen: null,
+      lastSeen: null,
       searchUrl: `https://webarchive.loc.gov/all/*/${url}`,
       snapshots: [],
     },
@@ -196,10 +233,10 @@ function buildServices(url, { wayback, loc, uk, pt }) {
       name: 'UK Web Archive',
       description: 'Архив Британской библиотеки',
       color: '#16a085',
-      hasData: !!uk,
-      totalSnapshots: uk?.total ?? null,
-      firstSeen: uk?.firstSeen ?? null,
-      lastSeen: uk?.lastSeen ?? null,
+      hasData: true, // link only — CDX API discontinued
+      totalSnapshots: null,
+      firstSeen: null,
+      lastSeen: null,
       searchUrl: `https://www.webarchive.org.uk/wayback/archive/*/${url}`,
       snapshots: [],
     },
