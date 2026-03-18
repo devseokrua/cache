@@ -241,15 +241,15 @@ function buildServices(url, { wayback, pt }) {
     },
     {
       id: "uk",
-      name: "UK Web Archive",
-      description: "\u0410\u0440\u0445\u0438\u0432 \u0411\u0440\u0438\u0442\u0430\u043D\u0441\u043A\u043E\u0439 \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0438",
+      name: "UK National Archives",
+      description: "\u041D\u0430\u0446\u0438\u043E\u043D\u0430\u043B\u044C\u043D\u044B\u0439 \u0430\u0440\u0445\u0438\u0432 \u0412\u0435\u043B\u0438\u043A\u043E\u0431\u0440\u0438\u0442\u0430\u043D\u0438\u0438",
       color: "#16a085",
       hasData: true,
-      // link only — CDX API discontinued
+      // link only — no public CDX API
       totalSnapshots: null,
       firstSeen: null,
       lastSeen: null,
-      searchUrl: `https://www.webarchive.org.uk/wayback/archive/*/${url}`,
+      searchUrl: `https://webarchive.nationalarchives.gov.uk/search/result?q=${url}&site=${url}`,
       snapshots: []
     },
     {

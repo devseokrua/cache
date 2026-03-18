@@ -34,7 +34,7 @@ export async function onRequestGet(context) {
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
 
-  // Fetch archives in parallel — LoC and UK Web Archive CDX APIs are defunct,
+  // Fetch archives in parallel — LoC and UK National Archives CDX APIs are defunct,
   // so only Wayback Machine and Arquivo.pt are queried
   const [waybackRes, ptRes] = await Promise.allSettled([
     withTimeout(fetchWayback(cleanUrl), 20000),
@@ -150,7 +150,7 @@ async function fetchAvailability(url) {
   return a > b ? a : b;
 }
 
-// ─── Generic CDX query (for LoC, UK, Arquivo.pt) ─────────────────────────────
+// ─── Generic CDX query (unused — kept for reference) ─────────────────────────
 
 async function fetchCdx(cdxUrl) {
   let rows;
@@ -230,14 +230,14 @@ function buildServices(url, { wayback, pt }) {
     },
     {
       id: 'uk',
-      name: 'UK Web Archive',
-      description: 'Архив Британской библиотеки',
+      name: 'UK National Archives',
+      description: 'Национальный архив Великобритании',
       color: '#16a085',
-      hasData: true, // link only — CDX API discontinued
+      hasData: true, // link only — no public CDX API
       totalSnapshots: null,
       firstSeen: null,
       lastSeen: null,
-      searchUrl: `https://www.webarchive.org.uk/wayback/archive/*/${url}`,
+      searchUrl: `https://webarchive.nationalarchives.gov.uk/search/result?q=${url}&site=${url}`,
       snapshots: [],
     },
     {

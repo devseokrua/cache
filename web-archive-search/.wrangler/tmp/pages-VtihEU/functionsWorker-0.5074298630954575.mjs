@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../.wrangler/tmp/bundle-kYzJ8C/checked-fetch.js
+// ../.wrangler/tmp/bundle-pLHP9c/checked-fetch.js
 var urls = /* @__PURE__ */ new Set();
 function checkURL(request, init) {
   const url = request instanceof URL ? request : new URL(
@@ -207,15 +207,15 @@ function buildServices(url, { wayback, pt }) {
     },
     {
       id: "uk",
-      name: "UK Web Archive",
-      description: "\u0410\u0440\u0445\u0438\u0432 \u0411\u0440\u0438\u0442\u0430\u043D\u0441\u043A\u043E\u0439 \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0438",
+      name: "UK National Archives",
+      description: "\u041D\u0430\u0446\u0438\u043E\u043D\u0430\u043B\u044C\u043D\u044B\u0439 \u0430\u0440\u0445\u0438\u0432 \u0412\u0435\u043B\u0438\u043A\u043E\u0431\u0440\u0438\u0442\u0430\u043D\u0438\u0438",
       color: "#16a085",
       hasData: true,
-      // link only — CDX API discontinued
+      // link only — no public CDX API
       totalSnapshots: null,
       firstSeen: null,
       lastSeen: null,
-      searchUrl: `https://www.webarchive.org.uk/wayback/archive/*/${url}`,
+      searchUrl: `https://webarchive.nationalarchives.gov.uk/search/result?q=${url}&site=${url}`,
       snapshots: []
     },
     {
@@ -786,7 +786,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-kYzJ8C/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-pLHP9c/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -818,7 +818,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-kYzJ8C/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-pLHP9c/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
